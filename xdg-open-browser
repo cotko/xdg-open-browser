@@ -1,0 +1,329 @@
+#!/usr/bin/env node
+
+const { readFileSync, writeFileSync } = require('node:fs')
+const { execSync, spawn, spawnSync } = require('node:child_process')
+const os = require('node:os')
+const path = require('node:path')
+
+const XDG_OPEN_BIN = '/usr/bin/xdg-open'
+const PKG_NAME = 'xdg-open-browser'
+const PKG_DISPLAY_NAME = PKG_NAME.split('-')
+  .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+  .join(' ')
+
+function run() {
+  const arg0 = (process.argv[2] ?? '').toLowerCase()
+  const args = process.argv.slice(2)
+  const cfg = getCfg()
+
+  const xdgOpenBin = cfg._('xdgopenbin') ?? XDG_OPEN_BIN
+
+  if (arg0.startsWith('https://') || arg0.startsWith('http://')) {
+    if (openUrl(cfg, args)) {
+      return
+    }
+  }
+
+  execSync(`${xdgOpenBin} ${args}`)
+}
+
+function openUrl(cfg, args) {
+  const parentProcess = getParentProcess()
+
+  for (const [key, value] of cfg.entries()) {
+    // ignore reserved keys
+    if (key[0] === '_' && key[key.length - 1] === ':') {
+      continue
+    }
+    if (parentProcess.includes(key)) {
+      const browser = resolve({
+        value,
+        parentProcess,
+        args,
+        cfg,
+      })
+
+      if (browser) {
+        spawn(`${browser}`, args, {
+          detached: true,
+          stdio: 'ignore',
+        }).unref()
+
+        return true
+      }
+    }
+  }
+}
+
+function resolve({ value, parentProcess, args, cfg }) {
+  if (value === 'ask') {
+    return askUserForBrowser({ cfg })
+  }
+  if (value.startsWith('resolve:')) {
+    return resolveBrowser({
+      value: value.split('resolve:').pop().trim(),
+      parentProcess,
+      args,
+      cfg,
+    })
+  }
+
+  return value
+}
+
+function getParentProcess() {
+  return execSync(`ps -o comm= -p ${process.ppid}`)
+    .toString('utf-8')
+    .replace(/\n|\s/g, '')
+}
+
+function askUserForBrowser({ cfg }) {
+  const browsers = cfg._('browsers') || {}
+
+  const browserList = Object.entries(browsers).flatMap(([displayName, bin]) => [
+    bin,
+    displayName,
+  ])
+
+  if (browserList.length === 0) {
+    try {
+      confirmDialog({
+        cfg,
+        title: 'No browsers configured',
+        msg: 'Do you wish to edit the config file and setup the list?',
+      })
+      config(cfg)
+      process.exit()
+    } catch (_) {
+      process.exit(1)
+    }
+  }
+
+  if (browserList.length === 2) {
+    return browserList[0]
+  }
+
+  try {
+    return chooseDialog({
+      msg: 'Choose browser',
+      list: browserList,
+      cfg,
+    })
+  } catch (_) {
+    process.exit(1)
+  }
+}
+
+function resolveBrowser({ value, parentProcess, args, cfg }) {
+  const errObj = {
+    title: 'Error resolving browser',
+    msg: `Using resolver for process [color=orange]${parentProcess}[/color]:[nl][color=orange]${value}[/color][nl][nl]`,
+    cfg,
+  }
+
+  const { error, stdout, stderr } = spawnSync(value, [parentProcess, ...args])
+
+  if (error) {
+    showError({
+      ...errObj,
+      msg: `${errObj.msg}${error.message}`,
+    })
+    process.exit(1)
+  }
+
+  const err = stderr.toString().replace(/\n/g, '[nl]')
+  const out = stdout.toString().replace(/\n|\s/g, '')
+
+  if (out.length === 0 && err.length > 0) {
+    showError({
+      ...errObj,
+      msg: `${errObj.msg}[color=gray]${err}[/color]`,
+    })
+    process.exit(1)
+  }
+
+  // if resolver script returns 'HANDLED' then do not do anything
+  if (out === 'HANDLED') {
+    process.exit(0)
+  }
+  return out
+}
+
+//
+// CONFIG
+//
+//
+
+function getCfg() {
+  getAndAssureConfigDir()
+  const cfgFile = getCfgFilePath()
+  let cfg
+  try {
+    cfg = JSON.parse(readFileSync(cfgFile, 'utf8'))
+  } catch (_) {
+    cfg = getDefaultCfg()
+    writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+  }
+
+  return {
+    _: (key) => cfg[`_${key}:`],
+    get: (key) => (key ? cfg[key] : cfg),
+    entries: () => Object.entries(cfg),
+  }
+}
+
+function getDefaultCfg() {
+  return {
+    '/* _browsers: */':
+      "key<>value map of 'browser display name' <> 'browser binary'",
+    '_browsers:': {},
+    '/* _xdgopenbin: */': 'location of real xdg-open binary',
+    '_xdgopenbin:': XDG_OPEN_BIN,
+    '/* _dialog: */': 'which dialog to use (kdialog or zenity)',
+    '_dialog:': whichDialogCmd(),
+  }
+}
+
+function getCfgFilePath() {
+  return path.join(getUserDirFor('.config'), 'config.json')
+}
+
+function getAndAssureConfigDir() {
+  const dir = getUserDirFor('.config')
+  execSync(`mkdir -p ${dir}`)
+  return dir
+}
+
+function getUserDirFor(which) {
+  if (process.platform === 'win32') {
+    return path.join(
+      process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+      PKG_NAME,
+    )
+  }
+
+  // On Linux/macOS, check XDG_CONFIG_HOME first, otherwise ~/.config
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME
+  if (xdgConfigHome) {
+    return path.join(xdgConfigHome, PKG_NAME)
+  }
+  return path.join(os.homedir(), which, PKG_NAME)
+}
+
+//
+// DIALOGS
+//
+//
+
+function confirmDialog({ title, msg, cfg }) {
+  let cmd
+  if (cfg._('dialog') === 'zenity') {
+    cmd = `zenity --question --text="${title}\n\n${msg}" --title="${PKG_DISPLAY_NAME}"`
+  } else {
+    cmd = `kdialog --title "${PKG_DISPLAY_NAME}" --yesno "${title}\n\n${msg}"`
+  }
+
+  cmd = insertDialogMarkup({ cmd, cfg })
+
+  execSync(cmd, { stdio: 'ignore' })
+}
+
+function chooseDialog({ msg, list: listOrig, cfg }) {
+  const list = listOrig.map((s) => `"${s}"`).join(' ')
+  let cmd
+
+  if (cfg._('dialog') === 'zenity') {
+    cmd = `zenity --title="${PKG_DISPLAY_NAME}" --text ${msg} --list --column="browser-bin" --column="Browser" --hide-column=1 ${list}`
+  } else {
+    cmd = `kdialog --title "${PKG_DISPLAY_NAME}" --menu "${msg}" ${list}`
+  }
+
+  cmd = insertDialogMarkup({ cmd, cfg })
+
+  return execSync(cmd).toString().replace(/\n|\s/g, '')
+}
+
+function showError({ msg, title, cfg }) {
+  let cmd
+  if (cfg._('dialog') === 'zenity') {
+    cmd = `zenity --title '${PKG_DISPLAY_NAME}' --text '${title}${msg}' --error`
+  } else {
+    cmd = `kdialog --title '${PKG_DISPLAY_NAME}' --sorry '${title}${msg}'`
+  }
+
+  cmd = insertDialogMarkup({ cmd, cfg })
+
+  execSync(cmd, { stdio: 'ignore' })
+}
+
+function insertDialogMarkup({ cmd, cfg }) {
+  const isZenity = cfg._('dialog') === 'zenity'
+  const regex = /\[color=([^\]]+)\]/g
+  let match
+  // biome-ignore lint/suspicious/noAssignInExpressions: <explanation>
+  while ((match = regex.exec(cmd)) !== null) {
+    cmd = cmd.replace(
+      match[0],
+      isZenity
+        ? `<span color="${match[1]}">`
+        : `<span style="color:${match[1]}">`,
+    )
+  }
+  cmd = cmd.split('[/color]').join('</span>')
+  if (isZenity) {
+    cmd = cmd.split('[nl]').join('\n')
+  } else {
+    cmd = cmd.split('[nl]').join('<br>')
+  }
+
+  return cmd
+}
+
+function whichDialogCmd() {
+  const candidates = ['kdialog', 'zenity']
+  for (const cmd of candidates) {
+    try {
+      execSync(`which ${cmd}`, { stdio: 'ignore' })
+      return cmd
+    } catch (_) { }
+  }
+  execSync(
+    `notify-send "xdg-open (browser) ${candidates.join(' / ')} not available"`,
+  )
+  process.exit(1)
+}
+
+function help() {
+  if (!process.argv.includes('--help')) {
+    return
+  }
+
+  console.info(`
+A wrapper script around xdg-open allowing for setting up the rules what browser should links be opened in
+
+More info: https://github.com/cotko/${PKG_NAME}
+
+options:
+ --help
+    show this help
+ --config
+    edit the config file
+
+  `)
+
+  process.exit(0)
+}
+
+function config(cfg) {
+  if (!cfg && !process.argv.includes('--config')) {
+    return
+  }
+
+  const xdgBin = (cfg || getCfg())._('xdgopenbin')
+  execSync(`${xdgBin} ${getCfgFilePath()}`)
+  process.exit()
+}
+
+help()
+config()
+run()

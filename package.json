@@ -1,0 +1,9 @@
+{
+  "name": "xdg-open-browser",
+  "version": "1.0.0",
+  "description": "A wrapper script around xdg-open allowing for setting up the rules what browser should links be opened in",
+  "license": "UNLICENSED",
+  "author": "Cotko <cotko@gmail.com>",
+  "type": "commonjs",
+  "main": "xdg-open-browser"
+}
