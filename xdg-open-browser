@@ -57,7 +57,7 @@ function openUrl(cfg, args) {
 
 function resolve({ value, parentProcess, args, cfg }) {
   if (value === 'ask') {
-    return askUserForBrowser({ cfg })
+    return askUserForBrowser({ cfg, args })
   }
   if (value.startsWith('resolve:')) {
     return resolveBrowser({
@@ -74,10 +74,11 @@ function resolve({ value, parentProcess, args, cfg }) {
 function getParentProcess() {
   return execSync(`ps -o comm= -p ${process.ppid}`)
     .toString('utf-8')
-    .replace(/\n|\s/g, '')
+    .replace(/\n/g, '')
+    .trim()
 }
 
-function askUserForBrowser({ cfg }) {
+function askUserForBrowser({ cfg, args }) {
   const browsers = cfg._('browsers') || {}
 
   const browserList = Object.entries(browsers).flatMap(([displayName, bin]) => [
@@ -105,7 +106,7 @@ function askUserForBrowser({ cfg }) {
 
   try {
     return chooseDialog({
-      msg: 'Choose browser',
+      msg: `Choose browser to open:[nl][color=lightgray]${args}[/color]`,
       list: browserList,
       cfg,
     })
@@ -218,9 +219,9 @@ function getUserDirFor(which) {
 function confirmDialog({ title, msg, cfg }) {
   let cmd
   if (cfg._('dialog') === 'zenity') {
-    cmd = `zenity --question --text="${title}\n\n${msg}" --title="${PKG_DISPLAY_NAME}"`
+    cmd = `zenity --question --text='${title}\n\n${msg}' --title='${PKG_DISPLAY_NAME}'`
   } else {
-    cmd = `kdialog --title "${PKG_DISPLAY_NAME}" --yesno "${title}\n\n${msg}"`
+    cmd = `kdialog --title '${PKG_DISPLAY_NAME}' --yesno '${title}\n\n${msg}'`
   }
 
   cmd = insertDialogMarkup({ cmd, cfg })
@@ -233,9 +234,9 @@ function chooseDialog({ msg, list: listOrig, cfg }) {
   let cmd
 
   if (cfg._('dialog') === 'zenity') {
-    cmd = `zenity --title="${PKG_DISPLAY_NAME}" --text ${msg} --list --column="browser-bin" --column="Browser" --hide-column=1 ${list}`
+    cmd = `zenity --title='${PKG_DISPLAY_NAME}' --text='${msg}' --list --column='browser-bin' --column='Browser' --hide-column=1 ${list}`
   } else {
-    cmd = `kdialog --title "${PKG_DISPLAY_NAME}" --menu "${msg}" ${list}`
+    cmd = `kdialog --title '${PKG_DISPLAY_NAME}' --menu '${msg}' ${list}`
   }
 
   cmd = insertDialogMarkup({ cmd, cfg })
@@ -285,10 +286,10 @@ function whichDialogCmd() {
     try {
       execSync(`which ${cmd}`, { stdio: 'ignore' })
       return cmd
-    } catch (_) { }
+    } catch (_) {}
   }
   execSync(
-    `notify-send "xdg-open (browser) ${candidates.join(' / ')} not available"`,
+    `notify-send '${PKG_DISPLAY_NAME}: ${candidates.join(' / ')} not available'`,
   )
   process.exit(1)
 }
@@ -299,7 +300,7 @@ function help() {
   }
 
   console.info(`
-A wrapper script around xdg-open allowing for setting up the rules what browser should links be opened in
+A script sitting in front of xdg-open allowing for setting up the rules what browser should links be opened in based on application/process that requested url to be opened
 
 More info: https://github.com/cotko/${PKG_NAME}
 
