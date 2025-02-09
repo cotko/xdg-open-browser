@@ -35,7 +35,7 @@ function openUrl(cfg, args) {
     if (key[0] === '_' && key[key.length - 1] === ':') {
       continue
     }
-    if (parentProcess.includes(key)) {
+    if (parentProcess.includes(key.toLowerCase())) {
       const browser = resolve({
         value,
         parentProcess,
@@ -76,6 +76,7 @@ function getParentProcess() {
     .toString('utf-8')
     .replace(/\n/g, '')
     .trim()
+    .toLowerCase()
 }
 
 function askUserForBrowser({ cfg, args }) {
@@ -196,14 +197,6 @@ function getAndAssureConfigDir() {
 }
 
 function getUserDirFor(which) {
-  if (process.platform === 'win32') {
-    return path.join(
-      process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
-      PKG_NAME,
-    )
-  }
-
-  // On Linux/macOS, check XDG_CONFIG_HOME first, otherwise ~/.config
   const xdgConfigHome = process.env.XDG_CONFIG_HOME
   if (xdgConfigHome) {
     return path.join(xdgConfigHome, PKG_NAME)
