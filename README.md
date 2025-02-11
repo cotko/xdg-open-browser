@@ -33,12 +33,12 @@ sudo curl -o /usr/local/bin/xdg-open \
 
 The configuration file is located at `~/.config/xdg-open-browser/config.json`. It is automatically created the first time script is run, or by running `xdg-open-browser --config` which will additionally open the config in default editor.
 
-Confugration includes some "private" keys that can/should be changed if needed:
-- *_xdgopenbin:* location of real xdg-open binary (default is `/usr/bin/xdg-open`)
-- *_dialog:* which dialog to use (kdialog or zenity)
-- *_browsers:* key<>value map of 'browser display name' <> 'browser binary'
-- *process* key<>value map of process/application name <> 'rule'. Key (process name / application) is case insensitive and partially matched to actual process name.
-- *domain* key<>value map of domain <> 'rule'. Key (domain) is partially matched to the domain of url being opened.
+Confugration (includes some defaults set/detected that can/should be changed if needed):
+- **xdgopenbin** location of real xdg-open binary (default is `/usr/bin/xdg-open`)
+- **dialog** which dialog to use (kdialog or zenity)
+- **browsers** key<>value map of 'browser display name' <> 'browser binary'
+- **process** key<>value map of process/application name <> 'rule'. Key (process name / application) is case insensitive and partially matched to actual process name.
+- **domain** key<>value map of domain <> 'rule'. Key (domain) is partially matched to the domain of url being opened.
 
 ### Rules
 
@@ -54,13 +54,13 @@ Each rule can be:
 
 ```json
 {
-  "_browsers:": {
+  "browsers": {
     "Brave": "brave",
     "Zen": "zen-browser",
     "Falkon": "falkon"
   },
-  "_xdgopenbin:": "/usr/bin/xdg-open",
-  "_dialog:": "zenity",
+  "xdgopenbin": "/usr/bin/xdg-open",
+  "dialog": "zenity",
   "process": {
     "aws":"brave",
     "postman":"ask",

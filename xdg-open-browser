@@ -16,7 +16,7 @@ function run() {
   const args = process.argv.slice(2)
   const cfg = getCfg()
 
-  const xdgOpenBin = cfg._('xdgopenbin') ?? XDG_OPEN_BIN
+  const xdgOpenBin = cfg.xdgopenbin ?? XDG_OPEN_BIN
 
   if (arg0.startsWith('https://') || arg0.startsWith('http://')) {
     if (openUrl(cfg, args)) {
@@ -94,7 +94,7 @@ function getParentProcess() {
 }
 
 function askUserForBrowser({ cfg, args }) {
-  const browsers = cfg._('browsers') || {}
+  const browsers = cfg.browsers || {}
 
   const browserList = Object.entries(browsers).flatMap(([displayName, bin]) => [
     bin,
@@ -182,7 +182,7 @@ function getCfg() {
   }
 
   return {
-    _: (key) => cfg[`_${key}:`],
+    ...cfg,
     domains: () => Object.entries(cfg.domain || {}),
     processes: () => Object.entries(cfg.process || {}),
   }
@@ -190,13 +190,13 @@ function getCfg() {
 
 function getDefaultCfg() {
   return {
-    '/* _browsers: */':
+    '/* browsers */':
       "key<>value map of 'browser display name' <> 'browser binary'",
-    '_browsers:': {},
-    '/* _xdgopenbin: */': 'location of real xdg-open binary',
-    '_xdgopenbin:': XDG_OPEN_BIN,
-    '/* _dialog: */': 'which dialog to use (kdialog or zenity)',
-    '_dialog:': whichDialogCmd(),
+    browsers: {},
+    '/* xdgopenbin */': 'location of real xdg-open binary',
+    xdgopenbin: XDG_OPEN_BIN,
+    '/* dialog */': 'which dialog to use (kdialog or zenity)',
+    dialog: whichDialogCmd(),
     '/* domain */': 'per domain rules',
     domain: {},
     '/* process */': 'per process/app name rules',
@@ -229,7 +229,7 @@ function getUserDirFor(which) {
 
 function confirmDialog({ title, msg, cfg }) {
   let cmd
-  if (cfg._('dialog') === 'zenity') {
+  if (cfg.dialog === 'zenity') {
     cmd = `zenity --question --text='${title}\n\n${msg}' --title='${PKG_DISPLAY_NAME}'`
   } else {
     cmd = `kdialog --title '${PKG_DISPLAY_NAME}' --yesno '${title}\n\n${msg}'`
@@ -244,7 +244,7 @@ function chooseDialog({ msg, list: listOrig, cfg }) {
   const list = listOrig.map((s) => `"${s}"`).join(' ')
   let cmd
 
-  if (cfg._('dialog') === 'zenity') {
+  if (cfg.dialog === 'zenity') {
     cmd = `zenity --title='${PKG_DISPLAY_NAME}' --text='${msg}' --list --column='browser-bin' --column='Browser' --hide-column=1 ${list}`
   } else {
     cmd = `kdialog --title '${PKG_DISPLAY_NAME}' --menu '${msg}' ${list}`
@@ -257,7 +257,7 @@ function chooseDialog({ msg, list: listOrig, cfg }) {
 
 function showError({ msg, title, cfg }) {
   let cmd
-  if (cfg._('dialog') === 'zenity') {
+  if (cfg.dialog === 'zenity') {
     cmd = `zenity --title '${PKG_DISPLAY_NAME}' --text '${title}${msg}' --error`
   } else {
     cmd = `kdialog --title '${PKG_DISPLAY_NAME}' --sorry '${title}${msg}'`
@@ -269,7 +269,7 @@ function showError({ msg, title, cfg }) {
 }
 
 function insertDialogMarkup({ cmd, cfg }) {
-  const isZenity = cfg._('dialog') === 'zenity'
+  const isZenity = cfg.dialog === 'zenity'
   const regex = /\[color=([^\]]+)\]/g
   let match
   // biome-ignore lint/suspicious/noAssignInExpressions: <explanation>
@@ -331,7 +331,7 @@ function config(cfg) {
     return
   }
 
-  const xdgBin = (cfg || getCfg())._('xdgopenbin')
+  const xdgBin = (cfg || getCfg()).xdgopenbin
   execSync(`${xdgBin} ${getCfgFilePath()}`)
   process.exit()
 }
