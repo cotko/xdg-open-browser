@@ -28,47 +28,61 @@ function run() {
 }
 
 function openUrl(cfg, args) {
+  const [url] = args
+  const domain = new URL(url).hostname
   const parentProcess = getParentProcess()
+  let rule
 
-  for (const [key, value] of cfg.entries()) {
-    // ignore reserved keys
-    if (key[0] === '_' && key[key.length - 1] === ':') {
-      continue
+  for (const [key, value] of cfg.domains()) {
+    if (domain.includes(key)) {
+      rule = value
+      break
     }
-    if (parentProcess.includes(key.toLowerCase())) {
-      const browser = resolve({
-        value,
-        parentProcess,
-        args,
-        cfg,
-      })
-
-      if (browser) {
-        spawn(`${browser}`, args, {
-          detached: true,
-          stdio: 'ignore',
-        }).unref()
-
-        return true
+  }
+  if (!rule) {
+    for (const [key, value] of cfg.processes()) {
+      if (parentProcess.includes(key.toLowerCase())) {
+        rule = value
+        break
       }
     }
   }
+
+  if (!rule) {
+    return
+  }
+
+  const browser = resolve({
+    rule,
+    parentProcess,
+    args,
+    cfg,
+  })
+
+  if (browser) {
+    spawn(`${browser}`, args, {
+      detached: true,
+      stdio: 'ignore',
+    }).unref()
+
+    return true
+  }
 }
 
-function resolve({ value, parentProcess, args, cfg }) {
-  if (value === 'ask') {
+function resolve({ rule, parentProcess, args, cfg }) {
+  if (rule === 'ask') {
     return askUserForBrowser({ cfg, args })
   }
-  if (value.startsWith('resolve:')) {
+  if (rule.startsWith('resolve:')) {
     return resolveBrowser({
-      value: value.split('resolve:').pop().trim(),
+      value: rule.split('resolve:').pop().trim(),
       parentProcess,
       args,
       cfg,
     })
   }
 
-  return value
+  return rule
 }
 
 function getParentProcess() {
@@ -169,8 +183,8 @@ function getCfg() {
 
   return {
     _: (key) => cfg[`_${key}:`],
-    get: (key) => (key ? cfg[key] : cfg),
-    entries: () => Object.entries(cfg),
+    domains: () => Object.entries(cfg.domain || {}),
+    processes: () => Object.entries(cfg.process || {}),
   }
 }
 
@@ -183,6 +197,10 @@ function getDefaultCfg() {
     '_xdgopenbin:': XDG_OPEN_BIN,
     '/* _dialog: */': 'which dialog to use (kdialog or zenity)',
     '_dialog:': whichDialogCmd(),
+    '/* domain */': 'per domain rules',
+    domain: {},
+    '/* process */': 'per process/app name rules',
+    process: {},
   }
 }
 

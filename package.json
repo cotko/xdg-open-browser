@@ -1,7 +1,7 @@
 {
   "name": "xdg-open-browser",
   "version": "1.0.0",
-  "description": "A script sitting in front of xdg-open allowing for setting up the rules what browser should links be opened in based on application/process that requested url to be opened",
+  "description": "A script sitting in front of `xdg-open` allowing for setting up the rules what browser should links be opened in based on domain or application/process that requested url to be opened",
   "license": "Unlicense",
   "author": "Cotko <cotko@gmail.com>",
   "type": "commonjs",

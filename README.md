@@ -1,8 +1,8 @@
 # XDG Open Browser
 
-A script sitting in front of `xdg-open` allowing for setting up the rules what browser should links be opened in based on application/process that requested url to be opened
+A script sitting in front of `xdg-open` allowing for setting up the rules what browser should links be opened in based on domain or application/process that requested url to be opened
 
-For any application/process it's possible to
+For any domain or application/process it's possible to
 - set what browser should be used for opening links
 - being asked what browser to open the link in
 - specify a custom script that resolves the browser or handles the url on its own
@@ -37,15 +37,18 @@ Confugration includes some "private" keys that can/should be changed if needed:
 - *_xdgopenbin:* location of real xdg-open binary (default is `/usr/bin/xdg-open`)
 - *_dialog:* which dialog to use (kdialog or zenity)
 - *_browsers:* key<>value map of 'browser display name' <> 'browser binary'
+- *process* key<>value map of process/application name <> 'rule'. Key (process name / application) is case insensitive and partially matched to actual process name.
+- *domain* key<>value map of domain <> 'rule'. Key (domain) is partially matched to the domain of url being opened.
 
-Other keys are considered a process/application name (or part fo the name - case insensitive), and the value can be:
+### Rules
+
+Each rule can be:
 - a browser binary (e.g. 'firefox'), to indicate what browser should be used
 - `ask` this will open a dialog to choose from browsers defined in *_browsers:* part of the config
 - `resolve:<path to some script>` this will invoke the script with two arguments; `<process/application name> <url>`
   - if the script prints something out, it's considered a browser binary that should be executed as `<browser-bin> <url>`
   - if script does not output anything, default `xdg-open` will be invoked
   - if script returns `HANDLED` then no further processing is done as this indicates that script did its own thing.
-
 
 #### Example config
 
@@ -58,9 +61,14 @@ Other keys are considered a process/application name (or part fo the name - case
   },
   "_xdgopenbin:": "/usr/bin/xdg-open",
   "_dialog:": "zenity",
-  "aws":"brave",
-  "postman":"ask",
-  "slack":"resolve:/home/xy/xdg-resolve-slack",
+  "process": {
+    "aws":"brave",
+    "postman":"ask",
+    "slack":"resolve:/home/xy/xdg-resolve-slack"
+  },
+  "domain": {
+    "zoom.us":"brave"
+  }
 }
 ```
 
