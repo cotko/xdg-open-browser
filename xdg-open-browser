@@ -70,16 +70,17 @@ function openUrl(cfg, args) {
 }
 
 function resolve({ rule, parentProcess, args, cfg }) {
-  if (rule === 'ask') {
-    return askUserForBrowser({ cfg, args })
-  }
   if (rule.startsWith('resolve:')) {
-    return resolveBrowser({
+    rule = resolveBrowser({
       value: rule.split('resolve:').pop().trim(),
       parentProcess,
       args,
       cfg,
     })
+  }
+
+  if (rule === 'ask') {
+    rule = askUserForBrowser({ cfg, args })
   }
 
   return rule
