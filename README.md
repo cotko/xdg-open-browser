@@ -85,7 +85,7 @@ Therefore it's possible to find last such log and decide what browser to use for
 #!/usr/bin/env fish
 # /home/xy/xdg-resolve-slack
 
-set teamLine (grep "teamId": ~/.config/Slack/logs/default/webapp-console.log | tail -n 1)
+set teamLine (grep 'teamId' ~/.config/Slack/logs/default/webapp-console.log | tail -n 1)
 
 # if teamId equals TEAM123, then open brave
 if string match -qri 'TEAM123' $teamLine

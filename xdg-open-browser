@@ -24,7 +24,10 @@ function run() {
     }
   }
 
-  execSync(`${xdgOpenBin} ${args}`)
+  spawn(xdgOpenBin, args, {
+    detached: true,
+    stdio: 'ignore',
+  }).unref()
 }
 
 function openUrl(cfg, args) {
